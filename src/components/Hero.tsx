@@ -22,17 +22,6 @@ export function Hero({ messageCount }: HeroProps) {
           {siteConfig.title}
         </h1>
 
-        {siteConfig.retireePhoto && (
-          <div className="mx-auto mt-8 h-32 w-32 overflow-hidden rounded-full border-4 border-white shadow-xl ring-2 ring-amber-200/60 sm:h-40 sm:w-40">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={siteConfig.retireePhoto}
-              alt={siteConfig.retireeName}
-              className="h-full w-full object-cover"
-            />
-          </div>
-        )}
-
         <p className="mt-6 text-lg leading-relaxed text-stone-600 sm:text-xl">
           {siteConfig.introText.replace("notre collègue", siteConfig.retireeName)}
         </p>
