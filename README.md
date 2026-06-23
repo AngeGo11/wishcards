@@ -6,7 +6,7 @@ Application web minimaliste permettant à plusieurs collègues de laisser des me
 
 - **Frontend** : Next.js 16 (App Router) + Tailwind CSS
 - **Backend** : API Routes Next.js
-- **Base de données** : MySQL via Cloudflare Hyperdrive
+- **Base de données** : Supabase (PostgreSQL)
 - **Déploiement** : Cloudflare Workers (OpenNext)
 
 ## Fonctionnalités
@@ -30,20 +30,24 @@ cd wishcards
 npm install
 ```
 
-### 2. Configurer la base de données
+### 2. Configurer Supabase
 
-Exécutez le script `sql/schema.mysql.sql` sur votre instance MySQL (PlanetScale, Railway, Aiven, hébergement mutualisé…).
-
-Un schéma PostgreSQL pour Supabase est aussi disponible dans `sql/schema.supabase.sql`.
+1. Créez un projet sur [supabase.com](https://supabase.com)
+2. **SQL Editor** → exécutez `sql/schema.supabase.sql`
+3. **Project Settings → API** → copiez l'URL et la clé secrète (`service_role` ou `secret`)
 
 ### 3. Variables d'environnement
 
 ```bash
 cp .env.example .env.local
-cp .dev.vars.example .dev.vars
 ```
 
-Remplissez `DATABASE_URL` dans `.env.local` pour le développement local.
+Remplissez dans `.env.local` :
+
+```env
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SECRET_KEY=sb_secret_...
+```
 
 ### 4. Lancer en développement
 
@@ -65,8 +69,9 @@ npm run preview
 
 | Variable | Obligatoire | Description |
 |----------|-------------|-------------|
-| `DATABASE_URL` | Local uniquement | URL MySQL pour `next dev` (`mysql://user:pass@host:3306/db`) |
-| `ADMIN_PASSWORD` | Oui | Mot de passe du panneau d'administration |
+| `SUPABASE_URL` | Oui | URL du projet Supabase |
+| `SUPABASE_SECRET_KEY` | Oui | Clé secrète serveur (Settings → API) |
+| `ADMIN_PASSWORD` | Oui | Mot de passe du panneau `/admin` |
 | `ADMIN_SESSION_SECRET` | Oui | Clé secrète (min. 16 caractères) pour signer les sessions admin |
 | `RATE_LIMIT_SECRET` | Oui | Clé secrète pour hasher les IP (anti-spam) |
 | `NEXT_PUBLIC_SITE_TITLE` | Non | Titre du site |
@@ -87,47 +92,22 @@ openssl rand -hex 32
 ### Prérequis
 
 - Un compte [Cloudflare](https://dash.cloudflare.com)
+- Un projet [Supabase](https://supabase.com) avec les tables créées
 - Wrangler CLI (inclus en devDependency)
-- Une base MySQL accessible depuis Internet
 
-### 1. Créer la configuration Hyperdrive
-
-Hyperdrive permet à Cloudflare Workers de se connecter à MySQL de façon performante et sécurisée.
+### 1. Configurer les secrets Cloudflare
 
 ```bash
 npx wrangler login
-npx wrangler hyperdrive create wishcards-db \
-  --connection-string="mysql://user:password@host:3306/wishcards"
-```
-
-Copiez l'`id` affiché et remplacez `<VOTRE_HYPERDRIVE_ID>` dans `wrangler.jsonc` :
-
-```jsonc
-"hyperdrive": [
-  {
-    "binding": "HYPERDRIVE",
-    "id": "votre-id-hyperdrive"
-  }
-]
-```
-
-### 2. Configurer les secrets Cloudflare
-
-```bash
+npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put ADMIN_PASSWORD
 npx wrangler secret put ADMIN_SESSION_SECRET
 npx wrangler secret put RATE_LIMIT_SECRET
 ```
 
-Ajoutez aussi les variables publiques dans le tableau de bord Cloudflare (**Workers & Pages → votre Worker → Settings → Variables**) ou via `wrangler.jsonc` :
+Mettez à jour `SUPABASE_URL` dans `wrangler.jsonc` → section `vars`.
 
-```
-NEXT_PUBLIC_RETIREE_NAME=Marie Martin
-NEXT_PUBLIC_RETIREE_PHOTO=https://...
-NEXT_PUBLIC_INTRO_TEXT=Votre texte personnalisé
-```
-
-### 3. Déployer
+### 2. Déployer
 
 **Via la ligne de commande :**
 
@@ -135,24 +115,29 @@ NEXT_PUBLIC_INTRO_TEXT=Votre texte personnalisé
 npm run deploy
 ```
 
-**Via Git (recommandé pour la production) :**
+**Via Git + GitHub Actions (CI/CD Cloudflare) :**
+
+1. Ajoutez ces secrets dans GitHub (**Settings → Secrets → Actions**) :
+   - `CLOUDFLARE_API_TOKEN` — token API Cloudflare (permission Workers Edit)
+   - `CLOUDFLARE_ACCOUNT_ID` — ID de votre compte Cloudflare
+2. Chaque push sur `main` déclenche `.github/workflows/cloudflare-deploy.yml`
+
+**Via Git + Dashboard Cloudflare :**
 
 1. Poussez le code sur GitHub ou GitLab
-2. Dans Cloudflare : **Workers & Pages → Create → Connect to Git**
-3. Sélectionnez le dépôt
-4. Configuration du build :
+2. Cloudflare → **Workers & Pages → Create → Connect to Git**
+3. Configuration du build :
    - **Build command** : `npm run build`
-   - **Deploy command** : `npx opennextjs-cloudflare build && npx opennextjs-cloudflare deploy`
-5. Ajoutez les variables d'environnement et secrets dans le dashboard
-6. Chaque push sur `main` déclenche un déploiement automatique
+   - **Deploy command** : `npm run deploy`
+4. Ajoutez les secrets via `wrangler secret put` ou le dashboard
 
-### 4. Partager le lien
+### 3. Partager le lien
 
 Votre application sera accessible sur `https://wishcards.<votre-compte>.workers.dev` ou sur votre domaine personnalisé.
 
 L'accès admin : `/admin`
 
-### 5. Domaine personnalisé (optionnel)
+### 4. Domaine personnalisé (optionnel)
 
 Dans **Workers & Pages → votre Worker → Settings → Domains & Routes**, ajoutez votre domaine (ex. `livre-or.votre-entreprise.fr`).
 
@@ -163,12 +148,12 @@ Dans **Workers & Pages → votre Worker → Settings → Domains & Routes**, ajo
 ```
 Utilisateur → Cloudflare CDN → Worker (OpenNext/Next.js)
                                     ↓
-                              Hyperdrive → MySQL
+                              Supabase (PostgreSQL)
 ```
 
-- **OpenNext** (`@opennextjs/cloudflare`) : adapte le build Next.js pour Cloudflare Workers
-- **Hyperdrive** : pool de connexions MySQL au edge, compatible `mysql2`
-- **Wrangler** : CLI de déploiement et gestion des secrets
+- **OpenNext** : adapte Next.js pour Cloudflare Workers
+- **Supabase** : base de données + interface Table Editor pour voir les messages
+- **Wrangler** : déploiement et secrets
 
 ---
 
@@ -189,11 +174,13 @@ Utilisateur → Cloudflare CDN → Worker (OpenNext/Next.js)
 
 ```
 wishcards/
-├── wrangler.jsonc            # Config Cloudflare Workers + Hyperdrive
-├── open-next.config.ts       # Config OpenNext
+├── wrangler.jsonc                  # Config Cloudflare (Worker, vars, Hyperdrive)
+├── open-next.config.ts             # Adaptateur OpenNext
+├── .github/workflows/
+│   └── cloudflare-deploy.yml       # CI/CD GitHub → Cloudflare
+├── .dev.vars.example               # Variables locales Workers (preview)
 ├── sql/
-│   ├── schema.mysql.sql
-│   └── schema.supabase.sql
+│   └── schema.supabase.sql   # Schéma PostgreSQL Supabase
 ├── public/_headers           # Cache des assets statiques
 ├── src/
 │   ├── app/                  # Pages + API
@@ -221,7 +208,7 @@ wishcards/
 
 | Problème | Solution |
 |----------|----------|
-| Erreur de connexion MySQL en prod | Vérifiez l'ID Hyperdrive dans `wrangler.jsonc` et que la base accepte les connexions externes |
+| Erreur de connexion Supabase | Vérifiez `SUPABASE_URL` et `SUPABASE_SECRET_KEY`, et que les tables existent |
 | Worker trop volumineux | Plan Workers Paid requis si > 3 Mo compressé (jspdf augmente la taille) |
 | Variables non chargées | Vérifiez les secrets dans le dashboard Cloudflare |
 | Build échoue | Assurez-vous que `nodejs_compat` est activé dans `wrangler.jsonc` |

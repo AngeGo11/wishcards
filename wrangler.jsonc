@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wishcards",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "wishcards"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "NEXT_PUBLIC_SITE_TITLE": "Livre d'Or de Départ à la Retraite",
+    "NEXT_PUBLIC_RETIREE_NAME": "HOLY",
+    "NEXT_PUBLIC_RETIREE_PHOTO": "",
+    "NEXT_PUBLIC_INTRO_TEXT": "Avant son départ à la retraite, laissez-lui un mot chaleureux. Chaque message compte et fera sourire !",
+    "SUPABASE_URL": "https://fwspvaqerjsojgtwxdad.supabase.co"
+  }
+  // Secrets (npx wrangler secret put ...) :
+  // SUPABASE_SECRET_KEY, ADMIN_PASSWORD, ADMIN_SESSION_SECRET, RATE_LIMIT_SECRET
+}
